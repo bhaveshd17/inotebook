@@ -12,7 +12,6 @@ secret = 'BhAvEsHIsGoOdBoY'
 
 
 
-
 def viewData(request):
     user = User.objects.all()
     serializer = UserSerializer(user, many=True)
