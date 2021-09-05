@@ -1,3 +1,5 @@
+import os
+
 import jwt
 from django.contrib.auth.models import User
 from django.http import JsonResponse
@@ -7,9 +9,10 @@ from rest_framework.response import Response
 from .serializers import UserSerializer
 from rest_framework.views import APIView
 from rest_framework.exceptions import AuthenticationFailed
+from .decorators import unauthenticated_user
+from .utils import jwtAuthToken
 
-secret = 'BhAvEsHIsGoOdBoY'
-
+secret = str(os.getenv('SECRET_JWT'))
 
 
 def viewData(request):
@@ -19,6 +22,15 @@ def viewData(request):
 
 def notes(request):
     return JsonResponse({'name':'notes'}, safe=False)
+
+@unauthenticated_user(secret=secret)
+def getUser(request, response):
+    user_data = response['response']
+    status = response['status']
+
+    return JsonResponse(user_data, status=status)
+
+
 
 
 
@@ -39,29 +51,22 @@ class CreateUser(APIView):
                         first_name=res['first_name'],
                     )
                     user = User.objects.filter(username=res['username']).first()
-                    payload = {
-                        'user_id': user.id,
-                        'username': user.username
-                    }
-
-                    authToken = jwt.encode(payload, secret, algorithm='HS256').encode('utf-8')
-                    response = Response()
-                    response.set_cookie(key='authToken', value=authToken, httponly=True)
-                    response.data = {
-                        'authToken': authToken
-                    }
-
+                    response = jwtAuthToken(user, secret)
+                    status = 200
                     return response
                 else:
-                    res = {"password": ["password should has minimum 8 character"]}
+                    res = {"details": ["password should has minimum 8 character"]}
+                    status = 403
             else:
-                res = {"password": ["password and conform password should be same"]}
+                res = {"details": ["password and conform password should be same"]}
+                status = 403
 
         else:
             print(serialized_data.errors)
             res = serialized_data.errors
+            status = 403
 
-        return Response(res)
+        return Response(res, status=status)
 
 
 class LoginUser(APIView):
@@ -75,17 +80,15 @@ class LoginUser(APIView):
         if not user.check_password(password):
             raise AuthenticationFailed("Incorrect Password")
 
-        payload = {
-            'user_id': user.id,
-            'username': user.username
-        }
-
-        authToken = jwt.encode(payload, secret, algorithm='HS256').encode('utf-8')
-        response = Response()
-        response.set_cookie(key='authToken', value=authToken, httponly=True)
-        response.data = {
-            'authToken': authToken
-        }
-
+        response = jwtAuthToken(user, secret)
         return response
 
+
+class LogoutUser(APIView):
+    def post(self, request):
+        response = Response()
+        response.delete_cookie('authToken')
+        response.data = {
+            "message":"logout successfully"
+        }
+        return response
