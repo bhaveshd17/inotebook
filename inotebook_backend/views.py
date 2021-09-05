@@ -1,12 +1,13 @@
 import os
-
-import jwt
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 import json
 
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .serializers import UserSerializer
+
+from .models import Notes
+from .serializers import UserSerializer, NotesSerializer, AllNotesSerializer
 from rest_framework.views import APIView
 from rest_framework.exceptions import AuthenticationFailed
 from .decorators import unauthenticated_user
@@ -15,20 +16,85 @@ from .utils import jwtAuthToken
 secret = str(os.getenv('SECRET_JWT'))
 
 
-def viewData(request):
-    user = User.objects.all()
-    serializer = UserSerializer(user, many=True)
-    return JsonResponse(serializer.data, safe=False)
-
-def notes(request):
-    return JsonResponse({'name':'notes'}, safe=False)
-
 @unauthenticated_user(secret=secret)
-def getUser(request, response):
+def getUser(request, response, p_key):
     user_data = response['response']
     status = response['status']
-
     return JsonResponse(user_data, status=status)
+
+@api_view(['GET'])
+@unauthenticated_user(secret=secret)
+def allNotes(request, response, p_key):
+    user_data = response['response']
+    status = response['status']
+    if  str(user_data).lower() == 'unauthenticated':
+        res = {"User": "Unauthenticated"}
+    else:
+        user = User.objects.filter(username=user_data['username']).first()
+        notes = Notes.objects.filter(user=user)
+        notes_serialized_data = AllNotesSerializer(notes, many=True)
+        res = notes_serialized_data.data
+    return JsonResponse(res, status=status, safe=False)
+
+
+@api_view(['POST'])
+@unauthenticated_user(secret=secret)
+def createNote(request, response, p_key):
+   user_data = response['response']
+   status = response['status']
+   if str(user_data).lower() == 'unauthenticated':
+       res = {"User": "Unauthenticated"}
+   else:
+       note_serializer = NotesSerializer(data=request.data)
+       if note_serializer.is_valid():
+           user = User.objects.filter(username=user_data['username']).first()
+           Notes.objects.create(
+               user=user,
+               title=note_serializer['title'].value,
+               description=note_serializer['description'].value,
+               tags=note_serializer['tags'].value
+           )
+           res = note_serializer.data
+
+       else:
+           res = {"data": note_serializer.errors}
+           status = 400
+   return JsonResponse(res, status=status, safe=False)
+
+
+@api_view(['POST', 'PUT'])
+@unauthenticated_user(secret=secret)
+def editNote(request, response, p_key):
+    user_data = response['response']
+    status = response['status']
+    if str(user_data).lower() == 'unauthenticated':
+        res = {"User": "Unauthenticated"}
+    else:
+        note = Notes.objects.filter(id=p_key).first()
+        note_serializer = NotesSerializer(instance=note, data=request.data)
+        if note_serializer.is_valid():
+            note_serializer.save()
+            res = note_serializer.data
+
+        else:
+            res = {"data": note_serializer.errors}
+            status = 400
+    return JsonResponse(res, status=status, safe=False)
+
+
+@api_view(['DELETE'])
+@unauthenticated_user(secret=secret)
+def deleteNote(request, response, p_key):
+    user_data = response['response']
+    status = response['status']
+    if str(user_data).lower() == 'unauthenticated':
+        res = {"User": "Unauthenticated"}
+    else:
+        note = Notes.objects.filter(id=p_key).first()
+        note.delete()
+        res = {"message": "successfully deleted"}
+    return JsonResponse(res, status=status, safe=False)
+
 
 
 
