@@ -1,4 +1,5 @@
 import os
+
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 import json
@@ -15,12 +16,13 @@ from .utils import jwtAuthToken
 
 secret = str(os.getenv('SECRET_JWT'))
 
-
+@api_view(['POST'])
 @unauthenticated_user(secret=secret)
 def getUser(request, response, p_key):
-    user_data = response['response']
+    res = response['response']
     status = response['status']
-    return JsonResponse(user_data, status=status)
+    return JsonResponse(res, status=status, safe=False)
+
 
 @api_view(['GET'])
 @unauthenticated_user(secret=secret)
@@ -47,14 +49,19 @@ def createNote(request, response, p_key):
    else:
        note_serializer = NotesSerializer(data=request.data)
        if note_serializer.is_valid():
-           user = User.objects.filter(username=user_data['username']).first()
-           Notes.objects.create(
-               user=user,
-               title=note_serializer['title'].value,
-               description=note_serializer['description'].value,
-               tags=note_serializer['tags'].value
-           )
-           res = note_serializer.data
+          try:
+              user = User.objects.filter(username=user_data['username']).first()
+              Notes.objects.create(
+                  user=user,
+                  title=note_serializer['title'].value,
+                  description=note_serializer['description'].value,
+                  tags=note_serializer['tags'].value
+              )
+              res = note_serializer.data
+
+          except Exception:
+              res = "Internal Server Error"
+              status = 500
 
        else:
            res = {"data": note_serializer.errors}
@@ -70,15 +77,19 @@ def editNote(request, response, p_key):
     if str(user_data).lower() == 'unauthenticated':
         res = {"User": "Unauthenticated"}
     else:
-        note = Notes.objects.filter(id=p_key).first()
-        note_serializer = NotesSerializer(instance=note, data=request.data)
-        if note_serializer.is_valid():
-            note_serializer.save()
-            res = note_serializer.data
+        try:
+            note = Notes.objects.filter(id=p_key).first()
+            note_serializer = NotesSerializer(instance=note, data=request.data)
+            if note_serializer.is_valid():
+                note_serializer.save()
+                res = note_serializer.data
 
-        else:
-            res = {"data": note_serializer.errors}
-            status = 400
+            else:
+                res = {"data": note_serializer.errors}
+                status = 400
+        except Exception:
+            res = "Internal Server Error"
+            status = 500
     return JsonResponse(res, status=status, safe=False)
 
 
@@ -90,9 +101,14 @@ def deleteNote(request, response, p_key):
     if str(user_data).lower() == 'unauthenticated':
         res = {"User": "Unauthenticated"}
     else:
-        note = Notes.objects.filter(id=p_key).first()
-        note.delete()
-        res = {"message": "successfully deleted"}
+        try:
+            note = Notes.objects.filter(id=p_key).first()
+            note.delete()
+            res = {"message": "successfully deleted"}
+        except Exception:
+            res = "Internal Server Error"
+            status = 500
+
     return JsonResponse(res, status=status, safe=False)
 
 
@@ -152,8 +168,7 @@ class LoginUser(APIView):
 
 class LogoutUser(APIView):
     def post(self, request):
-        response = Response()
-        response.delete_cookie('authToken')
+        response = Response(headers=None)
         response.data = {
             "message":"logout successfully"
         }
