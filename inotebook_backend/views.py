@@ -47,22 +47,21 @@ def createNote(request, response, p_key):
    if str(user_data).lower() == 'unauthenticated':
        res = {"User": "Unauthenticated"}
    else:
-       note_serializer = NotesSerializer(data=request.data)
+       note_serializer = AllNotesSerializer(data=request.data)
        if note_serializer.is_valid():
           try:
+              #remove this line afterward
               user = User.objects.filter(username=user_data['username']).first()
-              Notes.objects.create(
-                  user=user,
-                  title=note_serializer['title'].value,
-                  description=note_serializer['description'].value,
-                  tags=note_serializer['tags'].value
-              )
+              print(user.id)
+              
+              note_serializer.save()
               res = note_serializer.data
 
-          except Exception:
+          except Exception as e:
+              print(e)
               res = "Internal Server Error"
               status = 500
-
+              
        else:
            res = {"data": note_serializer.errors}
            status = 400
@@ -105,7 +104,7 @@ def deleteNote(request, response, p_key):
             note = Notes.objects.filter(id=p_key).first()
             note.delete()
             res = {"message": "successfully deleted"}
-        except Exception:
+        except Exception as e:
             res = "Internal Server Error"
             status = 500
 

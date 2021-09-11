@@ -14,11 +14,13 @@ def unauthenticated_user(secret):
                 response = serializer.data
                 status = 200
                 return view_function(request, {'response':response, 'status':status}, p_key)
-            except jwt.InvalidTokenError:
+            except jwt.InvalidTokenError as err:
+                print(err)
                 response = "Unauthenticated"
                 status = 401
                 return view_function(request, {'response':response, 'status':status}, p_key)
-            except Exception:
+            except Exception as e:
+                print(e)
                 response = "Internal Server Error"
                 status = 500
                 return view_function(request, {'response': response, 'status': status}, p_key)
