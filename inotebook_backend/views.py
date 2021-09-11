@@ -119,6 +119,7 @@ def deleteNote(request, response, p_key):
 # Authentication
 class CreateUser(APIView):
     def post(self, request):
+        success = False
         data = json.loads(request.body)
         serialized_data = UserSerializer(data=request.data)
         if serialized_data.is_valid():
@@ -132,14 +133,14 @@ class CreateUser(APIView):
                         first_name=res['first_name'],
                     )
                     user = User.objects.filter(username=res['username']).first()
-                    response = jwtAuthToken(user, secret)
+                    response = jwtAuthToken(user, secret, success)
                     status = 200
                     return response
                 else:
-                    res = {"details": ["password should has minimum 8 character"]}
+                    res = {"error": "password should has minimum 8 character", "success":success}
                     status = 403
             else:
-                res = {"details": ["password and conform password should be same"]}
+                res = {"error": "password and conform password should be same", "success":success}
                 status = 403
 
         else:
@@ -152,16 +153,17 @@ class CreateUser(APIView):
 
 class LoginUser(APIView):
     def post(self, request):
+        success = False
         username = request.data.get('username')
         password = request.data.get('password')
 
         user = User.objects.filter(username=username).first()
         if user is None:
-            raise AuthenticationFailed("User not found")
+            raise AuthenticationFailed({"error":"User not found", "success":success})
         if not user.check_password(password):
-            raise AuthenticationFailed("Incorrect Password")
+            raise AuthenticationFailed({"error":"Incorrect Password", "success":success})
 
-        response = jwtAuthToken(user, secret)
+        response = jwtAuthToken(user, secret, success)
         return response
 
 
