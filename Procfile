@@ -1,0 +1,1 @@
+web: gunicorn inotebook.wsgi --log-file -
